@@ -32,6 +32,7 @@ func New(s v1alpha1.Spec) *Kubernetes {
 		Spec: s,
 	}
 	k.client.APIServer = k.Spec.APIServer
+	k.client.ClusterName = k.Spec.ClusterName
 	k.differs = map[string]Differ{
 		"native": k.client.Diff,
 		"subset": k.client.SubsetDiff,

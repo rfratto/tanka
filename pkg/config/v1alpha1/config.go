@@ -17,6 +17,7 @@ type Metadata struct {
 // Spec defines Kubernetes properties
 type Spec struct {
 	APIServer    string `json:"apiServer"`
+	ClusterName  string `json:"clusterName"`
 	Namespace    string `json:"namespace"`
 	DiffStrategy string `json:"diffStrategy"`
 }

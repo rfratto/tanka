@@ -22,9 +22,10 @@ var (
 
 // Kubectl uses the `kubectl` command to operate on a Kubernetes cluster
 type Kubectl struct {
-	context   objx.Map
-	cluster   objx.Map
-	APIServer string
+	context     objx.Map
+	cluster     objx.Map
+	APIServer   string
+	ClusterName string
 }
 
 // Version returns the version of kubectl and the Kubernetes api server
@@ -66,11 +67,39 @@ func (k *Kubectl) setupContext() error {
 	}
 
 	var err error
-	k.cluster, k.context, err = contextFromKubeconfig(cfg, k.APIServer)
-	if err != nil {
+
+	if k.APIServer == "" {
+		k.cluster, k.context, err = namedContextFromKubeconfig(cfg, k.ClusterName)
 		return err
 	}
-	return nil
+
+	k.cluster, k.context, err = contextFromKubeconfig(cfg, k.APIServer)
+	return err
+}
+
+// namedContextFromKubeconfig searches a kubeconfig for a context of a cluster that matches the clusterName
+func namedContextFromKubeconfig(kubeconfig map[string]interface{}, clusterName string) (cluster, context objx.Map, err error) {
+	cfg := objx.New(kubeconfig)
+
+	// find the correct cluster
+	cluster = objx.New(funk.Find(cfg.Get("clusters").MustMSISlice(), func(x map[string]interface{}) bool {
+		host := objx.New(x).Get("name").MustStr()
+		return host == clusterName
+	}))
+	if !(len(cluster) > 0) { // empty map means no result
+		return nil, nil, fmt.Errorf("no cluster that matches the clusterName `%s` was found. Please check your $KUBECONFIG", clusterName)
+	}
+
+	// find a context that uses the cluster
+	context = objx.New(funk.Find(cfg.Get("contexts").MustMSISlice(), func(x map[string]interface{}) bool {
+		c := objx.New(x)
+		return c.Get("context.cluster").MustStr() == cluster.Get("name").MustStr()
+	}))
+	if !(len(context) > 0) {
+		return nil, nil, fmt.Errorf("no context that matches the cluster `%s` was found. Please check your $KUBECONFIG", cluster.Get("name").MustStr())
+	}
+
+	return cluster, context, nil
 }
 
 // contextFromKubeconfig searches a kubeconfig for a context of a cluster that matches the apiServer
